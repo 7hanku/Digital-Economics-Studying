@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>太阳系（可视化）演示</title>
+    <style>
+        /* 核心样式：确保 Canvas 占满全屏且无滚动条，背景纯黑 */
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000000;
+        }
+        canvas {
+            display: block; /* 防止 Canvas 底部出现微小空隙 */
+        }
+        #info{
+            position: absolute;
+            left: 18px;
+            top: 14px;
+            z-index: 9999;
+            background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(0,0,0,0.18));
+            border: 1px solid rgba(255,255,255,0.06);
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans', 'Helvetica Neue', Arial;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.6);
+        }
+    </style>
+</head>
+<body>
+    <canvas id="solarCanvas"></canvas>
+    <div id="info">
+        <strong>太阳系可视化</strong>
+        <div>包含：太阳 + 水星、金星、地球、火星、木星、土星、天王星、海王星</div>
+        <div style="margin-top:6px;font-size:12px;color:#ddd">提示：打开本文件于浏览器（双击或用 VS Code Live Server），窗口大小调整会自动适配。</div>
+    </div>
+
+<script>
+/*
+  太阳系可视化演示
+  - 用 Canvas 绘制太阳 + 八大行星（从水星到海王星）
+  - 每个行星有自己的轨道半径、尺寸、颜色与公转速度
+  - 响应式并考虑设备像素比
+*/
+
+(function() {
+    const canvas = document.getElementById('solarCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let w, h, cx, cy, dpr;
+
+    // 定义太阳和行星（近似可视化比例 — 为美观而非真实物理比例）
+    const sun = {
+        radius: 40,
+        color: 'radial-gradient', // we'll render gradient manually
+    };
+
+    // 行星数据：name, color, orbitalRadius (相对于 minDimension), radius(px), orbitalPeriod (秒)
+    const planets = [
+        { name: 'Mercury', color: '#bdbbb8', orbit: 0.08, radius: 4, period: 4 },
+        { name: 'Venus',   color: '#e6c07b', orbit: 0.14, radius: 7, period: 7 },
+        { name: 'Earth',   color: '#4aa3ff', orbit: 0.20, radius: 8, period: 10 },
+        { name: 'Mars',    color: '#f37a4b', orbit: 0.28, radius: 6, period: 18 },
+        { name: 'Jupiter', color: '#d3a88d', orbit: 0.40, radius: 18, period: 60 },
+        { name: 'Saturn',  color: '#e7d3a3', orbit: 0.52, radius: 15, period: 90, ring: true },
+        { name: 'Uranus',  color: '#9fe0e8', orbit: 0.67, radius: 12, period: 150 },
+        { name: 'Neptune', color: '#3c6cff', orbit: 0.80, radius: 12, period: 200 }
+    ];
+
+    // 每个行星的动态状态（角度）
+    const state = planets.map(p => ({ angle: Math.random() * Math.PI * 2 }));
+
+    // 渲染设置
+    const settings = {
+        orbitStroke: 'rgba(255,255,255,0.07)',
+        orbitDash: [2,4],
+        showLabels: true,
+        labelColor: 'rgba(255,255,255,0.7)'
+    };
+
+    // 初始化画布与监听
+    function resize() {
+        dpr = window.devicePixelRatio || 1;
+        w = window.innerWidth;
+        h = window.innerHeight;
+        canvas.width = Math.floor(w * dpr);
+        canvas.height = Math.floor(h * dpr);
+        canvas.style.width = w + 'px';
+        canvas.style.height = h + 'px';
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        cx = w / 2;
+        cy = h / 2;
+    }
+
+    // 绘制太阳（带光晕）
+    function drawSun() {
+        // 光晕
+        const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, sun.radius * 6);
+        glow.addColorStop(0, 'rgba(255,220,100,0.9)');
+        glow.addColorStop(0.4, 'rgba(255,165,60,0.25)');
+        glow.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(cx, cy, sun.radius * 6, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 太阳主体
+        const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, sun.radius);
+        grad.addColorStop(0, '#fff7c6');
+        grad.addColorStop(0.5, '#ffd36b');
+        grad.addColorStop(1, '#ff9a2b');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(cx, cy, sun.radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 微发光边缘
+        ctx.strokeStyle = 'rgba(255,220,120,0.3)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, sun.radius + 2, 0, Math.PI * 2);
+        ctx.stroke();
+    }
+
+    // 绘制某一颗行星及其轨道
+    function drawPlanet(index, planet, dt) {
+        // orbitalRadius 相对于最小尺寸
+        const minDim = Math.min(w, h);
+        const orbitR = Math.max(minDim * planet.orbit * 0.5, sun.radius + 20 + planet.radius);
+
+        // 绘制轨道（虚线）
+        ctx.beginPath();
+        ctx.setLineDash(settings.orbitDash);
+        ctx.strokeStyle = settings.orbitStroke;
+        ctx.lineWidth = 1;
+        ctx.arc(cx, cy, orbitR, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // 角速度：2π / period (period 为秒). 用 dt 来推进角度
+        const angularSpeed = (Math.PI * 2) / (planet.period * 60); // 用更慢更舒适的周期
+        state[index].angle += angularSpeed * dt;
+
+        const x = cx + Math.cos(state[index].angle) * orbitR;
+        const y = cy + Math.sin(state[index].angle) * orbitR;
+
+        // 行星主体
+        ctx.beginPath();
+        ctx.fillStyle = planet.color;
+        ctx.arc(x, y, planet.radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 若是土星一类则画环
+        if (planet.ring) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(state[index].angle * 0.2 + 0.3); // 模拟一点角度倾斜
+            ctx.scale(1.6, 0.6);
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(200,170,120,0.6)';
+            ctx.lineWidth = 3;
+            ctx.arc(0, 0, planet.radius + 5, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // 简单的光影（向太阳一侧更亮）
+        const vx = (cx - x) * 0.06;
+        const vy = (cy - y) * 0.06;
+        ctx.beginPath();
+        const shadingGrad = ctx.createRadialGradient(x - vx, y - vy, 0, x, y, planet.radius * 3);
+        shadingGrad.addColorStop(0, 'rgba(255,255,255,0.2)');
+        shadingGrad.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = shadingGrad;
+        ctx.arc(x, y, planet.radius * 3, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 行星名称标签（可选）
+        if (settings.showLabels) {
+            ctx.font = '12px system-ui, -apple-system, Roboto, Arial';
+            ctx.fillStyle = settings.labelColor;
+            ctx.textAlign = 'center';
+            ctx.fillText(planet.name, x, y - planet.radius - 8);
+        }
+    }
+
+    let lastTs = performance.now();
+    function animate(ts) {
+        const dt = (ts - lastTs) / 1000; // 秒
+        lastTs = ts;
+
+        // 背景
+        ctx.fillStyle = '#000012';
+        ctx.fillRect(0, 0, w, h);
+
+        // 很微弱的星点背景用于视觉深度
+        starfield();
+
+        // 太阳
+        drawSun();
+
+        // 绘制每个行星（轨道 + 行星）
+        for (let i = 0; i < planets.length; i++) {
+            drawPlanet(i, planets[i], dt);
+        }
+
+        requestAnimationFrame(animate);
+    }
+
+    // 绘制简单的星点背景（非粒子系统）
+    function starfield() {
+        const count = Math.min(200, Math.floor((w * h) / 5000));
+        ctx.save();
+        for (let i = 0; i < count; i++) {
+            const x = (Math.random() * w);
+            const y = (Math.random() * h);
+            const r = Math.random() * 1.5;
+            ctx.fillStyle = 'rgba(255,255,255,' + (Math.random() * 0.6 + 0.1) + ')';
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.restore();
+    }
+
+    // 初始和事件绑定
+    function init() {
+        resize();
+        window.addEventListener('resize', resize);
+        lastTs = performance.now();
+        requestAnimationFrame(animate);
+    }
+
+    init();
+
+})();
+</script>
+</body>
+</html>
