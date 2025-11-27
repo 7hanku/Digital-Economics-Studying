@@ -1,0 +1,225 @@
+{\rtf1\ansi\ansicpg936\cocoartf2820
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\paperw11900\paperh16840\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 <!DOCTYPE html>\
+<html lang="zh-CN">\
+<head>\
+    <meta charset="UTF-8">\
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">\
+    <title>\uc0\u21407 \u29983 HTML5 Canvas \u38134 \u27827 \u31995 \u21160 \u24577 \u28436 \u31034 </title>\
+    <style>\
+        /* \uc0\u26680 \u24515 \u26679 \u24335 \u65306 \u30830 \u20445  Canvas \u21344 \u28385 \u20840 \u23631 \u19988 \u26080 \u28378 \u21160 \u26465 \u65292 \u32972 \u26223 \u32431 \u40657  */\
+        body, html \{\
+            margin: 0;\
+            padding: 0;\
+            width: 100%;\
+            height: 100%;\
+            overflow: hidden;\
+            background-color: #000000;\
+        \}\
+        canvas \{\
+            display: block; /* \uc0\u38450 \u27490  Canvas \u24213 \u37096 \u20986 \u29616 \u24494 \u23567 \u31354 \u38553  */\
+        \}\
+    </style>\
+</head>\
+<body>\
+    <canvas id="galaxyCanvas"></canvas>\
+\
+<script>\
+/**\
+ * \uc0\u21069 \u31471 \u19987 \u23478 \u32423 \u38134 \u27827 \u31995 \u21487 \u35270 \u21270  Demo\
+ * \uc0\u26680 \u24515 \u25216 \u26415 : \u21407 \u29983  Canvas 2D API, \u26497 \u22352 \u26631 \u36816 \u31639 , \u31890 \u23376 \u31995 \u32479 \
+ */\
+\
+(function() \{\
+    const canvas = document.getElementById('galaxyCanvas');\
+    const ctx = canvas.getContext('2d');\
+    \
+    let w, h, cx, cy;\
+    let stars = [];\
+\
+    // --- \uc0\u37197 \u32622 \u21442 \u25968  (\u21487 \u22312 \u27492 \u22788 \u35843 \u25972 \u38134 \u27827 \u31995 \u22806 \u35266 ) ---\
+    const config = \{\
+        starCount: 12000,       // \uc0\u26143 \u26143 \u24635 \u25968  (\u36234 \u22810 \u36234 \u23494 \u38598 \u65292 \u20294 \u24615 \u33021 \u35201 \u27714 \u36234 \u39640 )\
+        armCount: 3,            // \uc0\u26059 \u33218 \u25968 \u37327  (\u38134 \u27827 \u31995 \u36890 \u24120 \u26377 2-4\u20010 \u20027 \u35201 \u26059 \u33218 )\
+        armTwist: 4.5,          // \uc0\u26059 \u33218 \u25197 \u26354 \u31243 \u24230  (\u36234 \u22823 \u36234 \u21367 )\
+        galaxyRadius: 0,        // \uc0\u38134 \u27827 \u31995 \u26368 \u22823 \u21322 \u24452  (\u31245 \u21518 \u21160 \u24577 \u35745 \u31639 )\
+        centerBulgeSize: 0.2,   // \uc0\u26680 \u24515 \u20984 \u36215 \u21306 \u22495 \u30340 \u30456 \u23545 \u22823 \u23567  (0-1)\
+        rotationSpeed: 0.0005,  // \uc0\u25972 \u20307 \u26059 \u36716 \u36895 \u24230 \u22522 \u25968 \
+        colors: \{\
+            center: \{ h: 40, s: 80, l: 70 \}, // \uc0\u38134 \u24515 \u39068 \u33394  (\u26262 \u40644 )\
+            outer: \{ h: 220, s: 80, l: 60 \}  // \uc0\u22806 \u22260 \u39068 \u33394  (\u20919 \u34013 )\
+        \}\
+    \};\
+\
+    // --- \uc0\u24037 \u20855 \u20989 \u25968  ---\
+    // \uc0\u29983 \u25104 \u39640 \u26031 \u20998 \u24067 \u30340 \u38543 \u26426 \u25968  (\u35753 \u26143 \u26143 \u26356 \u22810 \u22320 \u32858 \u38598 \u22312 \u20013 \u24515 \u21644 \u26059 \u33218 \u19978 )\
+    function randomGaussian() \{\
+        let u = 0, v = 0;\
+        while(u === 0) u = Math.random(); //Converting [0,1) to (0,1)\
+        while(v === 0) v = Math.random();\
+        return Math.sqrt( -2.0 * Math.log( u ) ) * Math.cos( 2.0 * Math.PI * v );\
+    \}\
+\
+    // \uc0\u32447 \u24615 \u25554 \u20540 \u39068 \u33394 \
+    function lerpColor(color1, color2, factor) \{\
+        let h = color1.h + factor * (color2.h - color1.h);\
+        let s = color1.s + factor * (color2.s - color1.s);\
+        let l = color1.l + factor * (color2.l - color1.l);\
+        return `hsl($\{h\}, $\{s\}%, $\{l\}%)`;\
+    \}\
+\
+    // --- \uc0\u26143 \u26143 \u31867 \u23450 \u20041  ---\
+    class Star \{\
+        constructor() \{\
+            this.reset();\
+            // \uc0\u21021 \u22987 \u21270 \u26102 \u32473 \u20104 \u38543 \u26426 \u30340 \u36215 \u22987 \u35282 \u24230 \u65292 \u36991 \u20813 \u19968 \u24320 \u22987 \u25152 \u26377 \u26143 \u26143 \u25490 \u25104 \u19968 \u26465 \u32447 \
+            this.angle = Math.random() * Math.PI * 2;\
+        \}\
+\
+        reset() \{\
+            // 1. \uc0\u35745 \u31639 \u21322 \u24452 \u65306 \u20351 \u29992 \u39640 \u26031 \u38543 \u26426 \u35753 \u26143 \u26143 \u32858 \u38598 \u22312 \u20013 \u24515 \u38468 \u36817 \
+            // Math.abs\uc0\u30830 \u20445 \u21322 \u24452 \u20026 \u27491 \u65292 \u38500 \u20197 \u19968 \u20010 \u25968 \u26469 \u25511 \u21046 \u20998 \u24067 \u30340 \u32039 \u20945 \u24230 \
+            let rSpread = Math.abs(randomGaussian()) / 2.5;\
+            // \uc0\u38480 \u21046 \u26368 \u22823 \u21322 \u24452 \
+            if (rSpread > 1) rSpread = 1;\
+            this.radiusNorm = rSpread; // \uc0\u24402 \u19968 \u21270 \u30340 \u21322 \u24452  (0.0 - 1.0)\
+            this.distance = this.radiusNorm * config.galaxyRadius;\
+\
+            // 2. \uc0\u35745 \u31639 \u35282 \u24230  (\u26680 \u24515 \u31639 \u27861 \u65306 \u24418 \u25104 \u26059 \u33218 )\
+            // \uc0\u22522 \u30784 \u35282 \u24230 \u26681 \u25454 \u26059 \u33218 \u25968 \u37327 \u20915 \u23450 \
+            let armIndex = Math.floor(Math.random() * config.armCount);\
+            let baseAngle = (Math.PI * 2 / config.armCount) * armIndex;\
+            \
+            // \uc0\u25197 \u26354 \u35282 \u24230 \u65306 \u36317 \u31163 \u20013 \u24515 \u36234 \u36828 \u65292 \u35282 \u24230 \u20559 \u31227 \u36234 \u22823 \u65292 \u24418 \u25104 \'93\u25302 \u23614 \'94\u25928 \u26524 \
+            let twistAngle = this.radiusNorm * config.armTwist;\
+            \
+            // \uc0\u38543 \u26426 \u20559 \u31227 \u65306 \u35753 \u26059 \u33218 \u30475 \u36215 \u26469 \u19981 \u26159 \u19968 \u26465 \u23436 \u32654 \u30340 \u32454 \u32447 \u65292 \u32780 \u26159 \u26377 \u23485 \u24230 \u30340 \
+            let angleSpread = (Math.random() - 0.5) * (0.5 + this.radiusNorm); // \uc0\u22806 \u22260 \u20063 \u26356 \u25955 \
+\
+            this.angleOffset = baseAngle + twistAngle + angleSpread;\
+            \
+            // 3. \uc0\u29289 \u29702 \u23646 \u24615  (\u27169 \u25311 \u28145 \u24230 \u21644 \u22823 \u23567 )\
+            // \uc0\u25105 \u20204 \u29992 \u19968 \u20010 \u20551 \u30340  "z" \u36724 \u26469 \u34920 \u31034 \u28145 \u24230 \u65292 \u21046 \u36896 \u35270 \u24046 \u21644 \u22823 \u23567 \u21464 \u21270 \
+            this.z = Math.random(); // 0 (\uc0\u36828 ) - 1 (\u36817 )\
+            this.baseSize = 0.5 + Math.random() * 1.5; \
+\
+            // 4. \uc0\u35745 \u31639 \u36895 \u24230 \u65306 \u36234 \u38752 \u36817 \u20013 \u24515 \u36716 \u24471 \u36234 \u24555  (\u31616 \u21270 \u29256 \u30340 \u24320 \u26222 \u21202 \u23450 \u24459 \u35270 \u35273 \u25928 \u26524 )\
+            this.angularVelocity = config.rotationSpeed * (1 / (this.radiusNorm + 0.1));\
+\
+            // 5. \uc0\u35745 \u31639 \u39068 \u33394 \
+            this.color = lerpColor(config.colors.center, config.colors.outer, this.radiusNorm);\
+        \}\
+\
+        update() \{\
+            // \uc0\u26356 \u26032 \u35282 \u24230 \
+            this.angle += this.angularVelocity;\
+            \
+            // \uc0\u21487 \u36873 \u65306 \u21152 \u19978 \u19968 \u28857 \u28857 \u38378 \u28865 \u25928 \u26524 \u65292 \u35753 \u30011 \u38754 \u26356 \u29983 \u21160 \
+            this.flicker = 0.8 + Math.random() * 0.2;\
+        \}\
+\
+        draw() \{\
+            // \uc0\u32467 \u21512 \u21021 \u22987 \u20559 \u31227 \u35282 \u21644 \u24403 \u21069 \u26059 \u36716 \u35282 \
+            const finalAngle = this.angle + this.angleOffset;\
+            \
+            // \uc0\u26497 \u22352 \u26631 \u36716 \u31515 \u21345 \u23572 \u22352 \u26631 \
+            let x = cx + Math.cos(finalAngle) * this.distance;\
+            let y = cy + Math.sin(finalAngle) * this.distance;\
+\
+            // \uc0\u20266  3D \u25928 \u26524 \u35745 \u31639 \
+            // \uc0\u38752 \u36817 \u20013 \u24515 \u30340 \u26143 \u26143 \u30475 \u36215 \u26469 \u26356 \u36828 \u65292 \u22806 \u22260 \u30340 \u30475 \u36215 \u26469 \u26356 \u36817  (\u27169 \u25311 \u20463 \u25293 \u35270 \u35282 )\
+            // \uc0\u25110 \u32773 \u65292 \u25105 \u20204 \u31616 \u21333 \u22320 \u35753 \u38543 \u26426 \u30340  Z \u20540 \u20915 \u23450 \u22823 \u23567 \u21644 \u20142 \u24230 \u65292 \u22686 \u21152 \u23618 \u27425 \u24863 \
+            const depthScale = 0.5 + this.z * 0.5; // 0.5 \uc0\u21040  1.0\
+            const size = this.baseSize * depthScale * (window.devicePixelRatio || 1);\
+            \
+            // \uc0\u20142 \u24230 \u38543 \u28145 \u24230 \u21644 \u26159 \u21542 \u22312 \u26680 \u24515 \u21306 \u22495 \u21464 \u21270 \
+            let alpha = this.z * this.flicker;\
+            // \uc0\u26680 \u24515 \u21306 \u22495 \u26356 \u20142 \
+            if (this.radiusNorm < config.centerBulgeSize) \{\
+                alpha += (1 - this.radiusNorm / config.centerBulgeSize) * 0.5;\
+            \}\
+            alpha = Math.min(1, alpha); // \uc0\u30830 \u20445 \u19981 \u36229 \u36807 1\
+\
+            // \uc0\u32472 \u21046 \u26143 \u26143 \
+            ctx.beginPath();\
+            ctx.fillStyle = this.color.replace('%)', `%, $\{alpha\})`); // \uc0\u27880 \u20837 \u36879 \u26126 \u24230 \
+            ctx.arc(x, y, size, 0, Math.PI * 2);\
+            ctx.fill();\
+            \
+            // \uc0\u21487 \u36873 \u65306 \u20026 \u38750 \u24120 \u20142 \u30340 \u26143 \u26143 \u28155 \u21152 \u19968 \u28857 \u20809 \u26197 \u25928 \u26524  (\u24615 \u33021 \u20250 \u26377 \u36731 \u24494 \u24433 \u21709 \u65292 \u20294 \u25928 \u26524 \u22909 )\
+            if (alpha > 0.8 && size > 1.5) \{\
+                 ctx.beginPath();\
+                 ctx.fillStyle = this.color.replace('%)', `%, $\{alpha * 0.3\})`);\
+                 ctx.arc(x, y, size * 2.5, 0, Math.PI * 2);\
+                 ctx.fill();\
+            \}\
+        \}\
+    \}\
+\
+    // --- \uc0\u21021 \u22987 \u21270 \u19982 \u20107 \u20214 \u22788 \u29702  ---\
+    function init() \{\
+        resize();\
+        window.addEventListener('resize', resize);\
+        \
+        // \uc0\u21019 \u24314 \u26143 \u26143 \u38431 \u21015 \
+        for (let i = 0; i < config.starCount; i++) \{\
+            stars.push(new Star());\
+        \}\
+        \
+        animate();\
+    \}\
+\
+    // \uc0\u31383 \u21475 \u22823 \u23567 \u35843 \u25972 \u22788 \u29702  (\u20445 \u35777 \u31283 \u23450 \u24615 )\
+    function resize() \{\
+        // \uc0\u32771 \u34385 \u35774 \u22791 \u20687 \u32032 \u27604 \u65292 \u30830 \u20445 \u39640 \u28165 \u23631 \u26174 \u31034 \u28165 \u26224 \
+        const dpr = window.devicePixelRatio || 1;\
+        w = window.innerWidth;\
+        h = window.innerHeight;\
+        canvas.width = w * dpr;\
+        canvas.height = h * dpr;\
+        ctx.scale(dpr, dpr);\
+        \
+        cx = w / 2;\
+        cy = h / 2;\
+        \
+        // \uc0\u21160 \u24577 \u35745 \u31639 \u38134 \u27827 \u31995 \u21322 \u24452 \u65292 \u20351 \u20854 \u36866 \u24212 \u23631 \u24149 \u36739 \u30701 \u30340 \u19968 \u36793 \u65292 \u24182 \u30041 \u20986 \u20313 \u37327 \
+        config.galaxyRadius = Math.min(w, h) * 0.45;\
+\
+        // \uc0\u37325 \u32622 \u25152 \u26377 \u26143 \u26143 \u30340 \u20301 \u32622 \u20197 \u36866 \u24212 \u26032 \u30340 \u23631 \u24149 \u23610 \u23544 \u65292 \u38450 \u27490 \u21464 \u24418 \
+        stars.forEach(star => star.reset());\
+    \}\
+\
+    // --- \uc0\u21160 \u30011 \u20027 \u24490 \u29615  ---\
+    function animate() \{\
+        // \uc0\u27599 \u19968 \u24103 \u28165 \u31354 \u30011 \u24067 \u12290 \u20351 \u29992 \u30053 \u24102 \u36879 \u26126 \u30340 \u40657 \u33394 \u21487 \u20197 \u21046 \u36896 \u26497 \u20854 \u24494 \u24369 \u30340 \u25302 \u24433 \u65292 \u20294 \u32431 \u40657 \u26356 \u24178 \u20928 \u31283 \u23450 \u12290 \
+        ctx.fillStyle = 'rgba(0, 0, 0, 1)';\
+        ctx.fillRect(0, 0, w, h);\
+\
+        // \uc0\u32472 \u21046 \u20013 \u24515 \u38750 \u24120 \u20142 \u30340 \u26680 \u24515 \u20809 \u26197 \
+        const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, config.galaxyRadius * config.centerBulgeSize);\
+        gradient.addColorStop(0, 'rgba(255, 240, 200, 0.2)');\
+        gradient.addColorStop(1, 'rgba(0,0,0,0)');\
+        ctx.fillStyle = gradient;\
+        ctx.fillRect(0, 0, w, h);\
+\
+        // \uc0\u26356 \u26032 \u24182 \u32472 \u21046 \u25152 \u26377 \u26143 \u26143 \
+        for (let star of stars) \{\
+            star.update();\
+            star.draw();\
+        \}\
+\
+        requestAnimationFrame(animate);\
+    \}\
+\
+    // \uc0\u21551 \u21160 \
+    init();\
+\
+\})();\
+</script>\
+</body>\
+</html>}
