@@ -1,0 +1,122 @@
+王钰芃 - Econometrics - 2025.11.05
+      name:  <unnamed>
+       log:  /Users/wangyupeng/Documents/Ecolometrics/HW2/logs/homework2.log
+  log type:  text
+ opened on:   5 Nov 2025, 14:09:47
+
+. set more off                                                              // (6)
+
+. set type double                                                           // (7)
+
+. scalar Apts = 4                                                           // (9)
+
+. scalar Bpts = 3                                                           // (9)
+
+. scalar Cpts = 2                                                           // (9)
+
+. scalar Dpts = 1                                                           // (9)
+
+. scalar Fpts = 0                                                           // (9)
+
+. import delimited "/Users/wangyupeng/Documents/Ecolometrics/HW2/Stata1_fake_data_grades.csv", clear   // (10)
+(encoding automatically selected: ISO-8859-2)
+(6 vars, 7 obs)
+
+. keep if s_type == "UG"                                                    // (11)
+(2 observations deleted)
+
+. gen int cl_grade_num = .                                                  // (12)
+(5 missing values generated)
+
+. replace cl_grade_num = Apts if cl_grade == "A"                            // (12)
+(2 real changes made)
+
+. replace cl_grade_num = Bpts if cl_grade == "B"                            // (12)
+(1 real change made)
+
+. replace cl_grade_num = Cpts if cl_grade == "C"                            // (12)
+(1 real change made)
+
+. replace cl_grade_num = Dpts if cl_grade == "D"                            // (12)
+(0 real changes made)
+
+. replace cl_grade_num = Fpts if cl_grade == "F"                            // (12)
+(1 real change made)
+
+. gen int cl_grade_pts = cl_units * cl_grade_num                            // (13)
+
+. collapse (sum) cl_units cl_grade_pts, by(s_id)                            // (14)
+
+. gen double s_GPA = cl_grade_pts / cl_units                                // (15)
+
+. drop cl_units cl_grade_pts                                                // (16)
+
+. sort s_id                                                                 // (17)
+
+. isid s_id                                                                 // (18)
+
+. save "/Users/wangyupeng/Documents/Ecolometrics/HW2/temp_gpa.dta", replace // (19)
+file /Users/wangyupeng/Documents/Ecolometrics/HW2/temp_gpa.dta saved
+
+. import delimited "/Users/wangyupeng/Documents/Ecolometrics/HW2/Stata1_fake_data_parents.csv", clear  // (20)
+(encoding automatically selected: ISO-8859-2)
+(3 vars, 8 obs)
+
+. rename student_id s_id                                                    // (21)
+
+. destring s_id, replace ignore("A")                                        // (22)
+s_id: character A removed; replaced as byte
+
+. reshape wide p_edu, i(s_id) j(parent)                                     // (23)
+(j = 1 2)
+
+Data                               Long   ->   Wide
+-----------------------------------------------------------------------------
+Number of observations                8   ->   5           
+Number of variables                   3   ->   3           
+j variable (2 values)            parent   ->   (dropped)
+xij variables:
+                                  p_edu   ->   p_edu1 p_edu2
+-----------------------------------------------------------------------------
+
+. egen p_edu_max = rowmax(p_edu*)                                           // (24)
+
+. sort s_id                                                                 // (25)
+
+. isid s_id                                                                 // (26)
+
+. merge 1:1 s_id using "/Users/wangyupeng/Documents/Ecolometrics/HW2/temp_gpa.dta"                     // (27)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             2
+        from master                         2  (_merge==1)
+        from using                          0  (_merge==2)
+
+    Matched                                 3  (_merge==3)
+    -----------------------------------------
+
+. drop if _merge == 1                                                       // (28)
+(2 observations deleted)
+
+. order s_id s_GPA                                                          // (29)
+
+. list                                                                       // (30)
+
+     +---------------------------------------------------------+
+     | s_id   s_GPA   p_edu1   p_edu2   p_edu_~x        _merge |
+     |---------------------------------------------------------|
+  1. |   20     3.5       12       16         16   Matched (3) |
+  2. |   30     2.5       18        .         18   Matched (3) |
+  3. |   40       0       12       12         12   Matched (3) |
+     +---------------------------------------------------------+
+
+. save "/Users/wangyupeng/Documents/Ecolometrics/HW2/final_output.dta", replace                        // (31)
+file /Users/wangyupeng/Documents/Ecolometrics/HW2/final_output.dta saved
+
+. log close                                                                 // (32)
+      name:  <unnamed>
+       log:  /Users/wangyupeng/Documents/Ecolometrics/HW2/logs/homework2.log
+  log type:  text
+ closed on:   5 Nov 2025, 14:09:47
+---------------------------------------------------------------------------------------------------------------------------------------
